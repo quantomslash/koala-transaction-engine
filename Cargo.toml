@@ -1,0 +1,9 @@
+[package]
+name = "koala-transaction-engine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+csv = "*"
+serde = { version = "*", features = ["derive"] }
+thiserror = "*"
