@@ -33,6 +33,9 @@ In order to limit the time spend on this, I skipped the unit tests and decided t
 
 Also, the transaction set has been manually tested frequently during development.
 
+## CI
+
+Test passes in CI with the sample test data.
 
 ## Further improvements
 
