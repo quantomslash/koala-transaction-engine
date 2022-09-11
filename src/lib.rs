@@ -26,7 +26,7 @@ struct Transaction {
     tx_type: String,
     #[serde(rename = "client")]
     client: u16,
-    tx: u32,
+    tx: String,
     #[serde(deserialize_with = "csv::invalid_option")]
     amount: Option<f32>,
 }
@@ -71,7 +71,6 @@ pub fn process(filename: String) -> Result<String, KoalaError> {
 
     Ok(CLIENT_FILE_NAME.to_string())
 
-    // Ok(())
 }
 
 fn initialize_files() -> Result<(), KoalaError> {
@@ -133,7 +132,7 @@ fn update_record(cr: &ClientRecord) -> Result<(), KoalaError> {
     Ok(())
 }
 
-fn find_original_transaction(tx_id: u32, txs: &Vec<Transaction>) -> Option<&Transaction> {
+fn find_original_transaction<'a>(tx_id: &str, txs: &'a Vec<Transaction>) -> Option<&'a Transaction> {
     for transaction in txs {
         if transaction.tx == tx_id {
             return Some(transaction);
@@ -142,7 +141,7 @@ fn find_original_transaction(tx_id: u32, txs: &Vec<Transaction>) -> Option<&Tran
     None
 }
 
-fn deposit_tx(tx: &Transaction) -> Result<u32, KoalaError> {
+fn deposit_tx(tx: &Transaction) -> Result<String, KoalaError> {
     let client_id = tx.client;
     let mut client_record = get_client_record(client_id)?;
 
@@ -156,13 +155,13 @@ fn deposit_tx(tx: &Transaction) -> Result<u32, KoalaError> {
         client_record.available += amount;
         client_record.total = client_record.available + client_record.held;
         update_record(&client_record)?;
-        return Ok(tx.tx);
+        return Ok(tx.tx.to_string());
     }
 
     Err(KoalaError::PartnerError)
 }
 
-fn withdrawal_tx(tx: &Transaction) -> Result<u32, KoalaError> {
+fn withdrawal_tx(tx: &Transaction) -> Result<String, KoalaError> {
     let client_id = tx.client;
     let mut client_record = get_client_record(client_id)?;
 
@@ -176,13 +175,13 @@ fn withdrawal_tx(tx: &Transaction) -> Result<u32, KoalaError> {
         client_record.available -= amount;
         client_record.total = client_record.available + client_record.held;
         update_record(&client_record)?;
-        return Ok(tx.tx);
+        return Ok(tx.tx.to_string());
     }
 
     Err(KoalaError::BalanceError)
 }
 
-fn dispute_tx(tx: &Transaction, txs: &Vec<Transaction>) -> Result<u32, KoalaError> {
+fn dispute_tx(tx: &Transaction, txs: &Vec<Transaction>) -> Result<String, KoalaError> {
     let client_id = tx.client;
     let mut client_record = get_client_record(client_id)?;
 
@@ -190,19 +189,19 @@ fn dispute_tx(tx: &Transaction, txs: &Vec<Transaction>) -> Result<u32, KoalaErro
         return Err(KoalaError::AccountLockedError);
     }
 
-    if let Some(transaction) = find_original_transaction(tx.tx, txs) {
+    if let Some(transaction) = find_original_transaction(&tx.tx, txs) {
         let amount = transaction.amount.unwrap_or_default();
         client_record.available -= amount;
         client_record.held += amount;
         client_record.total = client_record.available + client_record.held;
         update_record(&client_record)?;
-        return Ok(tx.tx);
+        return Ok(tx.tx.to_string());
     }
 
     Err(KoalaError::PartnerError)
 }
 
-fn resolve_tx(tx: &Transaction, txs: &Vec<Transaction>) -> Result<u32, KoalaError> {
+fn resolve_tx(tx: &Transaction, txs: &Vec<Transaction>) -> Result<String, KoalaError> {
     let client_id = tx.client;
     let mut client_record = get_client_record(client_id)?;
 
@@ -210,19 +209,19 @@ fn resolve_tx(tx: &Transaction, txs: &Vec<Transaction>) -> Result<u32, KoalaErro
         return Err(KoalaError::AccountLockedError);
     }
 
-    if let Some(transaction) = find_original_transaction(tx.tx, txs) {
+    if let Some(transaction) = find_original_transaction(&tx.tx, txs) {
         let amount = transaction.amount.unwrap_or_default();
         client_record.held -= amount;
         client_record.available += amount;
         client_record.total = client_record.available + client_record.held;
         update_record(&client_record)?;
-        return Ok(tx.tx);
+        return Ok(tx.tx.to_string());
     }
 
     Err(KoalaError::PartnerError)
 }
 
-fn chargeback_tx(tx: &Transaction, txs: &Vec<Transaction>) -> Result<u32, KoalaError> {
+fn chargeback_tx(tx: &Transaction, txs: &Vec<Transaction>) -> Result<String, KoalaError> {
     let client_id = tx.client;
     let mut client_record = get_client_record(client_id)?;
 
@@ -230,13 +229,13 @@ fn chargeback_tx(tx: &Transaction, txs: &Vec<Transaction>) -> Result<u32, KoalaE
         return Err(KoalaError::AccountLockedError);
     }
 
-    if let Some(transaction) = find_original_transaction(tx.tx, txs) {
+    if let Some(transaction) = find_original_transaction(&tx.tx, txs) {
         let amount = transaction.amount.unwrap_or_default();
         client_record.held -= amount;
         client_record.locked = true;
         client_record.total = client_record.available + client_record.held;
         update_record(&client_record)?;
-        return Ok(tx.tx);
+        return Ok(tx.tx.to_string());
     }
 
     Err(KoalaError::PartnerError)
