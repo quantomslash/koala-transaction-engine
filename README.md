@@ -1,6 +1,6 @@
 # Koala Transaction Engine
 
-Koala transaction engine (KTE) is the state of the the art transaction processing engine for all your transaction simulation needs. It can either use CSV files to process the data or the database.
+Koala transaction engine (KTE) is the state of the art transaction processing engine for all your transaction simulation needs. It can either use CSV files to process the data or the database.
 
 ## Commands
 - CSV method - `cargo run csv`
@@ -10,7 +10,7 @@ Koala transaction engine (KTE) is the state of the the art transaction processin
 - data - Contains the generated data for transactions, and is also a location for output data files and database.
 - src - Contains all the rust code.
 - tests - Integration tests for rust code.
-- utils - Contains uility scripts for generating data and output testing
+- utils - Contains utility scripts for generating data and output testing
 
 ### Building and running locally
 1. Git clone the project
@@ -23,17 +23,17 @@ Use `tx_gen.py` in utils to generate transactions.
 
 `python3 tx_gen.py -n 1000` 
 
-where n is the number of transactions to generate.
+where -n specifies the number of transactions to generate.
 
 ## Assumptions
 
-1. Every new session with KTE assumes fresh start with client accounts (Data is cleared).
+1. Every new session with KTE assumes a fresh start with client accounts (Data is cleared).
 2. Dispute is only for the deposit. 
 3. No transaction will apply to an account after it's been frozen.
 
 ## Tests
 
-Test are included at various levels.
+Tests are included at various levels.
 
 - Unit tests for main rust modules are present.
 - Integration tests are present both for database processor and csv processor
