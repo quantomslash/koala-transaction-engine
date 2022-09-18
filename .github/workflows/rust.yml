@@ -30,6 +30,6 @@ jobs:
     - name: Install dependencies
       run: pip3 install toml
     - name: Test CSV output
-      run: python3 utils/test_output.py -t csv
+      run: python3 utils/test_output.py -m csv
     - name: Test DB output
-      run: python3 utils/test_output.py -t db
+      run: python3 utils/test_output.py -m db
