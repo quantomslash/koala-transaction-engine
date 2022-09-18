@@ -20,3 +20,16 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+      
+  test:
+  
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: pip3 install toml
+    - name: Test CSV output
+      run: python3 utils/test_output.py -m csv
+    - name: Test DB output
+      run: python3 utils/test_output.py -m db

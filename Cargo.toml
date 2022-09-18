@@ -5,5 +5,8 @@ edition = "2021"
 
 [dependencies]
 csv = "*"
+rusqlite = "*"
 serde = { version = "*", features = ["derive"] }
+config = "*"
 thiserror = "*"
+rand = "*"
