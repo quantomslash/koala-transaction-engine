@@ -27,6 +27,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: pip3 install toml
     - name: Test CSV output
       run: python3 utils/test_output.py -t csv
     - name: Test DB output
