@@ -12,5 +12,7 @@ pub enum KoalaError {
     #[error("other error")]
     Other(#[from] csv::Error),
     #[error("io error")]
-    IO(#[from] std::io::Error)
+    IO(#[from] std::io::Error),
+    #[error("db error")]
+    DB(#[from] rusqlite::Error)
 }

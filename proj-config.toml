@@ -1,0 +1,5 @@
+input_file = "data/input/transactions.csv"
+output_file = "data/output/output.csv"
+output_test_file = "data/output/test_output.csv"
+tmp_db_file = "data/tmp/db.sqlite"
+tmp_csv_file = "data/tmp/tmp.csv"

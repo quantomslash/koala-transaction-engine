@@ -1,83 +1,228 @@
+# Utility file to generate large number of transactions quickly
+
 import os
 import csv
 import uuid
+import toml
 import random
+import argparse
 
-CSV_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
-TX_FILE_PATH = os.path.join(CSV_DIR, "transactions.csv")
-REC_FILE_PATH = os.path.join(CSV_DIR, "client_records.csv")
+config_file = os.path.join(os.path.dirname(__file__), "..", "proj-config.toml")
+config = toml.load(config_file)
+
+TX_FILE_PATH = config["input_file"]
+REC_FILE_PATH = config["output_test_file"]
+
 TX_TO_GENERATE = 100
 MAX_AMOUNT = 50000
-MIN_CLIENTS = 5
-MAX_CLIENTS = 50
+APPROX_TOTAL_CLIENTS = 2000  # Auto incremented if accounts are locked
+ROUND_DIGITS = 2
 TXS = []
 CLIENT_DICT = {}
+TX_COUNT = 0
+
+
+def increment_tx():
+    global TX_COUNT
+    TX_COUNT += 1
 
 
 def gen_tx_id():
     return str(uuid.uuid4())
 
 
-def deposit(writer, client_id, amount):
+def get_random_client_ids():
+    client_ids = list(CLIENT_DICT.keys())
+    random.shuffle(client_ids)
+
+    return client_ids
+
+
+def find_unlocked_client():
+    client_id = None
+    client_ids = get_random_client_ids()
+
+    for key in client_ids:
+        if CLIENT_DICT[key]["locked"] == False:
+            client_id = key
+
+    return client_id
+
+
+def deposit(writer, provided_id=None):
     tx_id = gen_tx_id()
+    client_id = None
+
+    if provided_id:
+        client_id = provided_id
+    else:
+        client_id = find_unlocked_client()
+
+    if client_id == None:
+        print("Unable to find client with unlocked account, new client required")
+        return 3
+
+    amount = random.uniform(1, MAX_AMOUNT)
+    amount = round(amount, ROUND_DIGITS)
+
     writer.writerow(["deposit", client_id, tx_id, amount])
 
     available = CLIENT_DICT[client_id]["available"]
-    new_available = round(available + amount, 2)
+    new_available = available + amount
     CLIENT_DICT[client_id]["available"] = new_available
-    
+
     total = CLIENT_DICT[client_id]["total"]
-    new_total = round(total + amount, 2)
+    new_total = total + amount
     CLIENT_DICT[client_id]["total"] = new_total
 
     TXS.append((tx_id, client_id, amount, "dep"))
+    increment_tx()
+
+    return 0
 
 
-def withdrawal(writer, client_id, amount):
+def withdrawal(writer):
     tx_id = gen_tx_id()
-    writer.writerow(["withdrawal", client_id, tx_id, amount])
+    client_id = find_unlocked_client()
 
-    available = CLIENT_DICT[client_id]["available"]
-    new_available = round(available - amount, 2)
-    CLIENT_DICT[client_id]["available"] = new_available
+    if client_id == None:
+        print("Unable to find client with unlocked account, new client required")
+        return 3
 
-    total = CLIENT_DICT[client_id]["total"]
-    new_total = round(total - amount, 2)
-    CLIENT_DICT[client_id]["total"] = new_total
+    available_balance = CLIENT_DICT[client_id]["available"]
 
-    TXS.append((tx_id, client_id, amount, "wdl"))
+    if available_balance > 0:
+        amount = random.uniform(0, available_balance - 1)
+        amount = round(amount, ROUND_DIGITS)
+
+        writer.writerow(["withdrawal", client_id, tx_id, amount])
+
+        available = CLIENT_DICT[client_id]["available"]
+        new_available = available - amount
+        CLIENT_DICT[client_id]["available"] = new_available
+
+        total = CLIENT_DICT[client_id]["total"]
+        new_total = total - amount
+        CLIENT_DICT[client_id]["total"] = new_total
+
+        TXS.append((tx_id, client_id, amount, "wdl"))
+        increment_tx()
+
+        return 0
+    else:
+        return 1
 
 
 def dispute(writer):
     client_id = None
     available = None
-    # Find a client that has positive balance and dispute for simplicity
-    for key, value in CLIENT_DICT.items():
-        if value["held"] == 0 and value["available"] > 0:
+
+    client_ids = get_random_client_ids()
+    # Find a client that has positive balance
+    for key in client_ids:
+        client = CLIENT_DICT[key]
+        if (
+            client["held"] == 0
+            and client["available"] > 0
+            and client["locked"] == False
+        ):
             client_id = key
-            available = value["available"]
+            available = client["available"]
 
     if client_id == None:
-        print("Couldn't find valid tx for dispute, skipping ...")
-        return
+        return 1
 
     # Get the amount
     amount, tx_id = get_tx_data(client_id, available)
 
     if amount == None:
-        print("Couldn't find valid tx for dispute, skipping ...")
-        return
+        return 1
 
     # Create the transaction
     writer.writerow(["dispute", client_id, tx_id, None])
 
     available = CLIENT_DICT[client_id]["available"]
-    new_available = round(available - amount, 2)
+    new_available = available - amount
     CLIENT_DICT[client_id]["available"] = new_available
 
     held = CLIENT_DICT[client_id]["held"]
-    new_held = round(held + amount, 2)
+    new_held = held + amount
     CLIENT_DICT[client_id]["held"] = new_held
+    increment_tx()
+
+    return 0
+
+
+def resolve(writer):
+    client_id = None
+    held = None
+
+    client_ids = get_random_client_ids()
+    # Find a client with held balance
+    for key in client_ids:
+        client = CLIENT_DICT[key]
+        if client["held"] > 0:
+            client_id = key
+            held = client["held"]
+
+    if client_id == None:
+        return 1
+
+    tx_id = get_held_tx_data(client_id, held)
+
+    if tx_id == None:
+        return 1
+
+    # Create the transaction
+    writer.writerow(["resolve", client_id, tx_id, None])
+
+    curr_held = CLIENT_DICT[client_id]["held"]
+    new_held = curr_held - held
+    CLIENT_DICT[client_id]["held"] = new_held
+
+    available = CLIENT_DICT[client_id]["available"]
+    new_available = available + held
+    CLIENT_DICT[client_id]["available"] = new_available
+    increment_tx()
+
+    return 0
+
+
+def chargeback(writer):
+    client_id = None
+    held = None
+
+    client_ids = get_random_client_ids()
+    # Find a client with held balance
+    for key in client_ids:
+        client = CLIENT_DICT[key]
+        if client["held"] > 0:
+            client_id = key
+            held = client["held"]
+
+    if client_id == None:
+        return 1
+
+    tx_id = get_held_tx_data(client_id, held)
+
+    if tx_id == None:
+        return 1
+
+    # Create the transaction
+    writer.writerow(["chargeback", client_id, tx_id, None])
+
+    curr_held = CLIENT_DICT[client_id]["held"]
+    new_held = curr_held - held
+    CLIENT_DICT[client_id]["held"] = new_held
+
+    total = CLIENT_DICT[client_id]["total"]
+    new_total = total - held
+    CLIENT_DICT[client_id]["total"] = new_total
+
+    CLIENT_DICT[client_id]["locked"] = True
+    increment_tx()
+
+    return 0
 
 
 def get_tx_data(client_id, available):
@@ -87,14 +232,22 @@ def get_tx_data(client_id, available):
         if i[1] == client_id and i[3] == "dep" and available > i[2]:
             amount = i[2]
             tx_id = i[0]
+
     return amount, tx_id
 
 
+def get_held_tx_data(client_id, held):
+    tx_id = None
+    for i in TXS:
+        if i[1] == client_id and i[3] == "dep" and held == i[2]:
+            tx_id = i[0]
+
+    return tx_id
+
+
 def init_client_dict():
-    total_clients = random.randint(MIN_CLIENTS, MAX_CLIENTS)
-    for i in range(total_clients):
-        id = i + 1
-        CLIENT_DICT[id] = {
+    for i in range(1, APPROX_TOTAL_CLIENTS + 1):
+        CLIENT_DICT[i] = {
             "available": 0,
             "held": 0,
             "total": 0,
@@ -102,7 +255,19 @@ def init_client_dict():
         }
 
 
-def main():
+def gen_new_client():
+    id = len(CLIENT_DICT) + 1
+    CLIENT_DICT[id] = {
+        "available": 0,
+        "held": 0,
+        "total": 0,
+        "locked": False,
+    }
+
+    return id
+
+
+def main(number_of_txs):
     init_client_dict()
 
     # Reset the csv files
@@ -116,33 +281,24 @@ def main():
         # Write the headers first
         wrt.writerow(["type", "client", "tx", "amount"])
 
-        for i in range(TX_TO_GENERATE):
+        while TX_COUNT < number_of_txs:
             # Choose a random transaction type
             tx_func = random.choices(
-                population=[deposit, withdrawal, dispute], weights=[1, 1, 0.1]
+                population=[deposit, withdrawal, dispute, resolve, chargeback],
+                weights=[2, 1, 1, 0.5, 0.05],
             )[0]
 
-            # Find a random client for the transaction
-            random_client = random.choice(list(CLIENT_DICT.keys()))
+            result = tx_func(wrt)
+            # This is to ensure the number of transactions match
+            if result == 1:
+                deposit(wrt)
+            elif result == 3:
+                id = gen_new_client()
+                deposit(wrt, id)
 
-            amount = 0
-            # if it's a withdrawal transaction, ensure the balance remains positive
-            available_balance = CLIENT_DICT[random_client]["available"]
-            if tx_func == withdrawal:
-                if available_balance > 0:
-                    amount = random.uniform(1, available_balance)
-                    amount = round(amount, 2)
-                else:
-                    tx_func = deposit
-            else:
-                amount = random.uniform(1, MAX_AMOUNT)
-                amount = round(amount, 2)
+            print("Generated txs", TX_COUNT)
 
-            # Generate the transactions
-            if tx_func == dispute:
-                tx_func(wrt)
-            else:
-                tx_func(wrt, random_client, amount)
+    print("Total transactions generated ----> ", TX_COUNT)
 
     # Write the output
     with open(REC_FILE_PATH, "w", newline="") as csvfile:
@@ -170,4 +326,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-n",
+        "--number",
+        type=int,
+        default=TX_TO_GENERATE,
+        help="Number of transactions to generate",
+    )
+    args = parser.parse_args()
+    main(args.number)
