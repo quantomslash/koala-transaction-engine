@@ -6,19 +6,19 @@ Koala transaction engine (KTE) is the state of the art transaction processing en
 - CSV method - `cargo run csv`
 - DB method - `cargo run db`
 
-### Main directories
+## Main directories
 - data - Contains the generated data for transactions, and is also a location for output data files and database.
 - src - Contains all the rust code.
 - tests - Integration tests for rust code.
 - utils - Contains utility scripts for generating data and output testing
 
-### Building and running locally
+## Building and running locally
 1. Git clone the project
 2. Run either `cargo run csv` or `cargo run db`
 
 You might have to install `libsqlite3-dev` on your linux system.
 
-### Generating data sets
+## Generating data sets
 Use `tx_gen.py` in utils to generate transactions.
 
 `python3 tx_gen.py -n 1000` 
